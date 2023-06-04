@@ -166,59 +166,80 @@ public:
         }
     }
 
+    //3頂点と球の半径と計算された球の中心座標が格納されるcenterを引数とし，
+    //球の中心座標を計算して，計算できたかどうかをBool値で返す．
     bool ComputeBallCenter(int vidx1,
                            int vidx2,
                            int vidx3,
                            double radius,
                            Eigen::Vector3d& center) {
+        //頂点を取得
         const Eigen::Vector3d& v1 = vertices[vidx1]->point_;
         const Eigen::Vector3d& v2 = vertices[vidx2]->point_;
         const Eigen::Vector3d& v3 = vertices[vidx3]->point_;
+        //頂点間の距離の二乗を計算する．
         double c = (v2 - v1).squaredNorm();
         double b = (v1 - v3).squaredNorm();
         double a = (v3 - v2).squaredNorm();
 
+        //各射影係数を計算
+        //射影係数とはベクトルを他のベクトルに沿って投影したときの長さや比率を表すために使われる係数
+        //このコードにおいてはそれぞれの頂点が三角形の中心に対して持つ「重み」を表す
+        //この値から外接円の中心座標を求められる
         double alpha = a * (b + c - a);
         double beta = b * (a + c - b);
         double gamma = c * (a + b - c);
         double abg = alpha + beta + gamma;
 
+        //射影係数の合計値が0に近い場合は終了
         if (abg < 1e-16) {
             return false;
         }
 
+        //射影係数を正規化
         alpha = alpha / abg;
         beta = beta / abg;
         gamma = gamma / abg;
 
+        //各頂点の座標に射影係数をかけて，合計すると外接円の中心座標がでる．
         Eigen::Vector3d circ_center = alpha * v1 + beta * v2 + gamma * v3;
-        double circ_radius2 = a * b * c;
-
+        //ヘロンの公式から頂点間の距離の積から外接円の半径の二乗を求める
+        double circ_radius2 = a * b * c;//ここではまだ半径の二乗ではない
         a = std::sqrt(a);
         b = std::sqrt(b);
         c = std::sqrt(c);
         circ_radius2 = circ_radius2 /
                        ((a + b + c) * (b + c - a) * (c + a - b) * (a + b - c));
 
+        //三角形から球の中心までの高さを求めている．
+        //球の半径の二乗から外接円の半径の二乗を引くと高さの二乗が求められる．
+        //ピタゴラスの定理を使っている．
         double height = radius * radius - circ_radius2;
+
+        //高さが負の正の値の場合，球の中心座標を求めている
         if (height >= 0.0) {
-            Eigen::Vector3d tr_norm = (v2 - v1).cross(v3 - v1);
-            tr_norm /= tr_norm.norm();
+            //法線計算
+            Eigen::Vector3d tr_norm = (v2 - v1).cross(v3 - v1);//(v2 - v1)と(v3 - v1)の外積を計算する
+            tr_norm /= tr_norm.norm();//法線ベクトルの正規化，.norm()はベクトルの長さを求める
+            //各頂点の法線ベクトルを足す．
             Eigen::Vector3d pt_norm = vertices[vidx1]->normal_ +
                                       vertices[vidx2]->normal_ +
                                       vertices[vidx3]->normal_;
-            pt_norm /= pt_norm.norm();
+            pt_norm /= pt_norm.norm();//各頂点の法線ベクトルの合計を正規化する．つまり法線ベクトルの平均値を取る事に相当する．
+            
+            //法線ベクトルの反転
             if (tr_norm.dot(pt_norm) < 0) {
                 tr_norm *= -1;
             }
 
-            height = sqrt(height);
-            center = circ_center + height * tr_norm;
+            height = sqrt(height);//高さを求める(ルート)
+            center = circ_center + height * tr_norm;//中心座標をcenterに格納
             return true;
         }
         return false;
     }
 
+    //与えられた頂点から辺を生成
     BallPivotingEdgePtr GetLinkingEdge(const BallPivotingVertexPtr& v0,
                                        const BallPivotingVertexPtr& v1) {
         for (BallPivotingEdgePtr edge0 : v0->edges_) {
@@ -232,6 +253,7 @@ public:
         return nullptr;
     }
 
+    //与えられた3点から3次元メッシュを生成
     void CreateTriangle(const BallPivotingVertexPtr& v0,
                         const BallPivotingVertexPtr& v1,
                         const BallPivotingVertexPtr& v2,
@@ -510,7 +532,7 @@ public:
         }
     }
 
-    //引数の3頂点がシード(最初の)三角形になれるかを判定する
+    //引数の3頂点が三角形になれるかを判定する
     bool TryTriangleSeed(const BallPivotingVertexPtr& v0,
                          const BallPivotingVertexPtr& v1,
                          const BallPivotingVertexPtr& v2,
@@ -522,18 +544,21 @@ public:
                 "radius={}",
                 v0->idx_, v1->idx_, v2->idx_, radius);
 
+        //3頂点が接続可能か判定
         if (!IsCompatible(v0, v1, v2)) {
             return false;
         }
 
-        BallPivotingEdgePtr e0 = GetLinkingEdge(v0, v2);
-        BallPivotingEdgePtr e1 = GetLinkingEdge(v1, v2);
+        BallPivotingEdgePtr e0 = GetLinkingEdge(v0, v2);//v0とv2から辺e0を生成
+        BallPivotingEdgePtr e1 = GetLinkingEdge(v1, v2);//v1とv2から辺e1を生成
+        //e0が存在し，e0のタイプがInnerの場合
         if (e0 != nullptr && e0->type_ == BallPivotingEdge::Type::Inner) {
             utility::LogDebug(
                     "[TryTriangleSeed] returns {} because e0 is inner edge",
                     false);
             return false;
         }
+        //e1が存在し，e1のタイプがInnerの場合
         if (e1 != nullptr && e1->type_ == BallPivotingEdge::Type::Inner) {
             utility::LogDebug(
                     "[TryTriangleSeed] returns {} because e1 is inner edge",
@@ -541,6 +566,8 @@ public:
             return false;
         }
 
+        //3頂点に接している球の中心座標を計算し，計算できたかのBool値を返す．
+        //計算でき無かった場合はここで終了する．
         if (!ComputeBallCenter(v0->idx_, v1->idx_, v2->idx_, radius, center)) {
             utility::LogDebug(
                     "[TryTriangleSeed] returns {} could not compute ball "
@@ -549,13 +576,16 @@ public:
             return false;
         }
 
-        // test if no other point is within the ball
+        // test if no other point is within the ball(ボール内に他の点が存在しないかをテストする)
+        //近傍の頂点をループで順番に調べる
         for (const auto& nbidx : nb_indices) {
             const BallPivotingVertexPtr& v = vertices[nbidx];
+            //引数の3頂点と調べている頂点が同じ場合は次の点を調べる
             if (v->idx_ == v0->idx_ || v->idx_ == v1->idx_ ||
                 v->idx_ == v2->idx_) {
                 continue;
             }
+            //球の中心と頂点の距離を計算して，半径未満であれば球内にボールが存在するとみなして終了
             if ((center - v->point_).norm() < radius - 1e-16) {
                 utility::LogDebug(
                         "[TryTriangleSeed] returns {} computed ball is not "
@@ -598,50 +628,59 @@ public:
             for (size_t nbidx1 = nbidx0 + 1; nbidx1 < indices.size();
                  ++nbidx1) {
                 const BallPivotingVertexPtr& nb1 = vertices[indices[nbidx1]];
+                //頂点タイプがOrphanの場合，つまりどのメッシュにも属していいない場合
                 if (nb1->type_ != BallPivotingVertex::Type::Orphan) {
-                    //頂点タイプがOrphanの場合，つまりどのメッシュにも属していいない場合
                     continue;
                 }
+                //発見した頂点が引数v頂点と同じ場合
                 if (nb1->idx_ == v->idx_) {
-                    //発見した頂点が引数v頂点と同じ場合
                     continue;
                 }
+                //vとnb0とnb1が三角形になれる場合
                 if (TryTriangleSeed(v, nb0, nb1, indices, radius, center)) {
+                    //candidate_vidx2にnb1のインデックス番号，つまり正の値を代入する．
                     candidate_vidx2 = nb1->idx_;
                     break;
                 }
             }
 
+            //candidate_vidx2 が非負の場合，つまりcandidate_vidx2にnb1のインデックス番号が代入された場合
             if (candidate_vidx2 >= 0) {
                 const BallPivotingVertexPtr& nb1 = vertices[candidate_vidx2];
 
-                BallPivotingEdgePtr e0 = GetLinkingEdge(v, nb1);
+                BallPivotingEdgePtr e0 = GetLinkingEdge(v, nb1);//e0辺を生成
+                //e0が存在して，タイプがFront(つまり境界エッジ)ではない場合
                 if (e0 != nullptr &&
                     e0->type_ != BallPivotingEdge::Type::Front) {
                     continue;
                 }
-                BallPivotingEdgePtr e1 = GetLinkingEdge(nb0, nb1);
+                BallPivotingEdgePtr e1 = GetLinkingEdge(nb0, nb1);//e1辺を生成
+                //e1が存在して，タイプがFront(つまり境界エッジ)ではない場合
                 if (e1 != nullptr &&
                     e1->type_ != BallPivotingEdge::Type::Front) {
                     continue;
                 }
-                BallPivotingEdgePtr e2 = GetLinkingEdge(v, nb0);
+                BallPivotingEdgePtr e2 = GetLinkingEdge(v, nb0);//e2辺を生成
+                //e2が存在して，タイプがFront(つまり境界エッジ)ではない場合
                 if (e2 != nullptr &&
                     e2->type_ != BallPivotingEdge::Type::Front) {
                     continue;
                 }
 
-                CreateTriangle(v, nb0, nb1, center);
+                CreateTriangle(v, nb0, nb1, center);//メッシュを生成
 
                 e0 = GetLinkingEdge(v, nb1);
                 e1 = GetLinkingEdge(nb0, nb1);
                 e2 = GetLinkingEdge(v, nb0);
+                //e0のタイプがFrontの場合，Frontリストにe0を追加する．
                 if (e0->type_ == BallPivotingEdge::Type::Front) {
                     edge_front_.push_front(e0);
                 }
+                //e1のタイプがFrontの場合，Frontリストにe1を追加する．
                 if (e1->type_ == BallPivotingEdge::Type::Front) {
                     edge_front_.push_front(e1);
                 }
+                //e2のタイプがFrontの場合，Frontリストにe2を追加する．
                 if (e2->type_ == BallPivotingEdge::Type::Front) {
                     edge_front_.push_front(e2);
                 }
