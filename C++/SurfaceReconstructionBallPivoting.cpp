@@ -129,6 +129,7 @@ void BallPivotingEdge::AddAdjacentTriangle(BallPivotingTrianglePtr triangle) {
     }
 }
 
+//現在のエッジに対して反対側の頂点を取得するための関数
 BallPivotingVertexPtr BallPivotingEdge::GetOppositeVertex() {
     if (triangle0_ != nullptr) {
         if (triangle0_->vert0_->idx_ != source_->idx_ &&
@@ -343,10 +344,11 @@ public:
             Eigen::Vector3d& candidate_center) {
         utility::LogDebug("[FindCandidateVertex] edge=({}, {}), radius={}",
                           edge->source_->idx_, edge->target_->idx_, radius);
+        //引数のエッジを構成する頂点を取得する
         BallPivotingVertexPtr src = edge->source_;
         BallPivotingVertexPtr tgt = edge->target_;
 
-        const BallPivotingVertexPtr opp = edge->GetOppositeVertex();
+        const BallPivotingVertexPtr opp = edge->GetOppositeVertex();//三つ目の候補点(opp)を見つけるための準備
         if (opp == nullptr) {
             utility::LogError("edge->GetOppositeVertex() returns nullptr.");
             assert(opp == nullptr);
@@ -490,11 +492,15 @@ public:
         return min_candidate;
     }
 
+    //トライアングルメッシュを拡張する
     void ExpandTriangulation(double radius) {
         utility::LogDebug("[ExpandTriangulation] radius={}", radius);
+
+        //Frontエッジがなくなるまでループ
         while (!edge_front_.empty()) {
-            BallPivotingEdgePtr edge = edge_front_.front();
-            edge_front_.pop_front();
+            BallPivotingEdgePtr edge = edge_front_.front();//Frontエッジリストの先頭からFrontエッジを取り出す
+            edge_front_.pop_front();//取り出したFrontエッジをリストから削除
+            //取り出したエッジがFrontエッジではない場合
             if (edge->type_ != BallPivotingEdge::Front) {
                 continue;
             }
