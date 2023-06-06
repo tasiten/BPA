@@ -105,10 +105,16 @@ void BallPivotingVertex::UpdateType() {
 
 
 //エッジ(BallPivotingEdge)に隣接する三角形を追加する.edge->AddAdjacentTriangle(triangle)のような形で使われる
+//エッジがどの三角形と隣接しているかをエッジ側が(triangle0やtriangle1として)記録するための関数
+//三角形ABCが出来た時点で辺AB,BC,CAは三角形ABCに隣接していると言える．なので辺ABのtriangle0は三角形ABCになる
+//そこに点Dが加わり，三角形BCDが出来たとすると，辺BCは三角形ABCと三角形BCDと隣接していることになる．
+//辺BCのtriangle0は三角形ABC，triangle1は三角形BCDとなる．
 void BallPivotingEdge::AddAdjacentTriangle(BallPivotingTrianglePtr triangle) {
+    //すでに引数の三角形が辺のtriangle0又はtriangle1でない場合
     if (triangle != triangle0_ && triangle != triangle1_) {
-        //ここでtriangle0を作成する?
+        //triangle0がまだ登録されていない場合
         if (triangle0_ == nullptr) {
+            //ここでtriangle0を作成する．
             triangle0_ = triangle;
             type_ = Type::Front;
             // update orientation
@@ -126,6 +132,7 @@ void BallPivotingEdge::AddAdjacentTriangle(BallPivotingTrianglePtr triangle) {
             } else {
                 utility::LogError("GetOppositeVertex() returns nullptr.");
             }
+        //triangle1がまだ登録されていない場合
         } else if (triangle1_ == nullptr) {
             triangle1_ = triangle;
             type_ = Type::Inner;
@@ -137,6 +144,7 @@ void BallPivotingEdge::AddAdjacentTriangle(BallPivotingTrianglePtr triangle) {
 
 //現在のエッジに対して反対側の頂点を取得するための関数，triangle0からtargetでもsourceでもない頂点を取得する
 BallPivotingVertexPtr BallPivotingEdge::GetOppositeVertex() {
+    //隣接する三角形がある場合
     if (triangle0_ != nullptr) {
         if (triangle0_->vert0_->idx_ != source_->idx_ &&
             triangle0_->vert0_->idx_ != target_->idx_) {
@@ -275,7 +283,7 @@ public:
         if (e0 == nullptr) {
             e0 = std::make_shared<BallPivotingEdge>(v0, v1);
         }
-        //エッジを三角形に登録する．
+        //エッジを三角形に登録する．triangle0やtraingle1を生成してエッジ側に記録させる．
         e0->AddAdjacentTriangle(triangle);
         v0->edges_.insert(e0);
         v1->edges_.insert(e0);
@@ -284,7 +292,7 @@ public:
         if (e1 == nullptr) {
             e1 = std::make_shared<BallPivotingEdge>(v1, v2);
         }
-        //エッジを三角形に登録する．
+        //エッジを三角形に登録する．triangle0やtraingle1を生成してエッジ側に記録させる．
         e1->AddAdjacentTriangle(triangle);
         v1->edges_.insert(e1);
         v2->edges_.insert(e1);
@@ -293,7 +301,7 @@ public:
         if (e2 == nullptr) {
             e2 = std::make_shared<BallPivotingEdge>(v2, v0);
         }
-        //エッジを三角形に登録する．
+        //エッジを三角形に登録する．triangle0やtraingle1を生成してエッジ側に記録させる．
         e2->AddAdjacentTriangle(triangle);
         v2->edges_.insert(e2);
         v0->edges_.insert(e2);
