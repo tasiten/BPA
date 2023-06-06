@@ -58,7 +58,7 @@ public:
 public:
     BallPivotingVertexPtr source_;
     BallPivotingVertexPtr target_;
-    //エッジが接する可能性がある二つの三角形(triangle0, triangle1)
+    //エッジが接する二つの三角形(triangle0, triangle1)
     BallPivotingTrianglePtr triangle0_;
     BallPivotingTrianglePtr triangle1_;
     Type type_;
@@ -144,7 +144,7 @@ void BallPivotingEdge::AddAdjacentTriangle(BallPivotingTrianglePtr triangle) {
 
 //現在のエッジに対して反対側の頂点を取得するための関数，triangle0からtargetでもsourceでもない頂点を取得する
 BallPivotingVertexPtr BallPivotingEdge::GetOppositeVertex() {
-    //隣接する三角形がある場合
+    //隣接する三角形がある(登録されている)場合
     if (triangle0_ != nullptr) {
         if (triangle0_->vert0_->idx_ != source_->idx_ &&
             triangle0_->vert0_->idx_ != target_->idx_) {
@@ -162,7 +162,7 @@ BallPivotingVertexPtr BallPivotingEdge::GetOppositeVertex() {
 
 class BallPivoting {
 public:
-    BallPivoting(const PointCloud& pcd)
+    BallPivoting(const PointCloud& pcd)//コンストラクタ関数，インスタンスが生成されるだけで実行される関数
         : has_normals_(pcd.HasNormals()), kdtree_(pcd) {
         mesh_ = std::make_shared<TriangleMesh>();//make_shardはインスタンス生成関数
         mesh_->vertices_ = pcd.points_;
