@@ -129,7 +129,7 @@ void BallPivotingEdge::AddAdjacentTriangle(BallPivotingTrianglePtr triangle) {
     }
 }
 
-//現在のエッジに対して反対側の頂点を取得するための関数
+//現在のエッジに対して反対側の頂点を取得するための関数，triangle0からtargetでもsourceでもない頂点を取得する
 BallPivotingVertexPtr BallPivotingEdge::GetOppositeVertex() {
     if (triangle0_ != nullptr) {
         if (triangle0_->vert0_->idx_ != source_->idx_ &&
@@ -348,7 +348,7 @@ public:
         BallPivotingVertexPtr src = edge->source_;
         BallPivotingVertexPtr tgt = edge->target_;
 
-        const BallPivotingVertexPtr opp = edge->GetOppositeVertex();//三つ目の候補点(opp)を見つけるための準備
+        const BallPivotingVertexPtr opp = edge->GetOppositeVertex();//三つ目の候補点(opp)を見つける，srcとtgtが含まれた三角形のもう一つの頂点を取得する
         if (opp == nullptr) {
             utility::LogError("edge->GetOppositeVertex() returns nullptr.");
             assert(opp == nullptr);
@@ -362,34 +362,37 @@ public:
         utility::LogDebug("[FindCandidateVertex] src={} => {}", opp->idx_,
                           opp->point_.transpose());
 
-        Eigen::Vector3d mp = 0.5 * (src->point_ + tgt->point_);
+        Eigen::Vector3d mp = 0.5 * (src->point_ + tgt->point_);//二つのベクトルの中点(平均)を求める．point_はベクトルを表す
         utility::LogDebug("[FindCandidateVertex] edge=({}, {}), mp={}",
                           edge->source_->idx_, edge->target_->idx_,
                           mp.transpose());
 
-        BallPivotingTrianglePtr triangle = edge->triangle0_;
-        const Eigen::Vector3d& center = triangle->ball_center_;
+        BallPivotingTrianglePtr triangle = edge->triangle0_;//引数のエッジが所属している三角形を取得
+        const Eigen::Vector3d& center = triangle->ball_center_;//取得した三角形から球の中心ベクトルを取得する
         utility::LogDebug("[FindCandidateVertex] edge=({}, {}), center={}",
                           edge->source_->idx_, edge->target_->idx_,
                           center.transpose());
 
-        Eigen::Vector3d v = tgt->point_ - src->point_;
-        v /= v.norm();
+        Eigen::Vector3d v = tgt->point_ - src->point_;//二つのベクトルの差分を求める，つまりsrcからtgtへの方向ベクトル
+        v /= v.norm();//方向ベクトルを正規化する．つまり方向ベクトルの大きさを計算し，単位ベクトルにする．
 
-        Eigen::Vector3d a = center - mp;
-        a /= a.norm();
+        Eigen::Vector3d a = center - mp;//中心ベクトルcneterから中点ベクトルmpへの方向ベクトル
+        a /= a.norm();////方向ベクトルを正規化する．つまり方向ベクトルの大きさを計算し，単位ベクトルにする．
 
+        //最近傍探索の結果を格納するための配列を準備
         std::vector<int> indices;
         std::vector<double> dists2;
-        kdtree_.SearchRadius(mp, 2 * radius, indices, dists2);
+        kdtree_.SearchRadius(mp, 2 * radius, indices, dists2);//mpを中心とした半径2*radiusの範囲内にある点を探索する．探索結果として範囲内点インデックスを配列indices，各点までの距離の2乗がdists2に格納される．
         utility::LogDebug("[FindCandidateVertex] found {} potential candidates",
                           indices.size());
 
         BallPivotingVertexPtr min_candidate = nullptr;
-        double min_angle = 2 * M_PI;
+        double min_angle = 2 * M_PI;//2πを準備
+        //探索した点をループで調べる
         for (auto nbidx : indices) {
             utility::LogDebug("[FindCandidateVertex] nbidx {:d}", nbidx);
-            const BallPivotingVertexPtr& candidate = vertices[nbidx];
+            const BallPivotingVertexPtr& candidate = vertices[nbidx];//探索点を取得
+            //点がsrcでもtgtでもoppでもないかを調べる．一致したらcontinueする
             if (candidate->idx_ == src->idx_ || candidate->idx_ == tgt->idx_ ||
                 candidate->idx_ == opp->idx_) {
                 utility::LogDebug(
@@ -402,7 +405,8 @@ public:
                               candidate->idx_, candidate->point_.transpose());
 
             bool coplanar = IntersectionTest::PointsCoplanar(
-                    src->point_, tgt->point_, opp->point_, candidate->point_);
+                    src->point_, tgt->point_, opp->point_, candidate->point_);//引数の4点が同一平面上に存在するか．存在する場合はTrueを返す
+            //各線分の最短距離が閾値未満か(つまり新たに生成される三角形が既存の三角形と交差市中を判定)，各点が同一平面上にあるかを判定，その場合はcontinue
             if (coplanar && (IntersectionTest::LineSegmentsMinimumDistance(
                                      mp, candidate->point_, src->point_,
                                      opp->point_) < 1e-12 ||
@@ -417,6 +421,7 @@ public:
             }
 
             Eigen::Vector3d new_center;
+            //srcとtgtとcandidateの球の中心座標を取得出来たかを判定，また新しい球の中心座標(new_center)を計算する
             if (!ComputeBallCenter(src->idx_, tgt->idx_, candidate->idx_,
                                    radius, new_center)) {
                 utility::LogDebug(
@@ -428,8 +433,10 @@ public:
             utility::LogDebug("[FindCandidateVertex] candidate {:d} center={}",
                               candidate->idx_, new_center.transpose());
 
-            Eigen::Vector3d b = new_center - mp;
-            b /= b.norm();
+            
+            //候補となる頂点candidateに対して、方向ベクトルbとそのベクトルとの角度（コサイン値）を計算する
+            Eigen::Vector3d b = new_center - mp;//二つのベクトルの差分を求める，つまりnew_centerからmpへの方向ベクトル
+            b /= b.norm();//方向ベクトルを正規化する．つまり方向ベクトルの大きさを計算し，単位ベクトルにする．
             utility::LogDebug(
                     "[FindCandidateVertex] candidate {:d} v={}, a={}, b={}",
                     candidate->idx_, v.transpose(), a.transpose(),
@@ -442,13 +449,15 @@ public:
                     "[FindCandidateVertex] candidate {:d} cosinus={:f}",
                     candidate->idx_, cosinus);
 
-            double angle = std::acos(cosinus);
+            double angle = std::acos(cosinus);//逆余弦を計算し、角度を求る
 
-            Eigen::Vector3d c = a.cross(b);
+            Eigen::Vector3d c = a.cross(b);//aとbの外積を求める，aとbに垂直なベクトルを求める
+            //vとcが反対を向いている場合
             if (c.dot(v) < 0) {
-                angle = 2 * M_PI - angle;
+                angle = 2 * M_PI - angle;//計算された角度 angle を0~2πの範囲に修正
             }
 
+            //angleがmin_angle以上の場合
             if (angle >= min_angle) {
                 utility::LogDebug(
                         "[FindCandidateVertex] candidate {:d} angle {:f} > "
@@ -458,12 +467,15 @@ public:
             }
 
             bool empty_ball = true;
+            //範囲内の点をループで調べる
             for (auto nbidx2 : indices) {
                 const BallPivotingVertexPtr& nb = vertices[nbidx2];
+                //範囲内点がsrc,tgt,condidateである場合，continue
                 if (nb->idx_ == src->idx_ || nb->idx_ == tgt->idx_ ||
                     nb->idx_ == candidate->idx_) {
                     continue;
                 }
+                //範囲内点と新しい球の距離が一定範囲未満の場合
                 if ((new_center - nb->point_).norm() < radius - 1e-16) {
                     utility::LogDebug(
                             "[FindCandidateVertex] candidate {:d} not an empty "
@@ -474,6 +486,7 @@ public:
                 }
             }
 
+            //一度でも範囲内点と新しい球の距離が一定範囲未満だった場合，変数を更新する
             if (empty_ball) {
                 utility::LogDebug("[FindCandidateVertex] candidate {:d} works",
                                   candidate->idx_);
@@ -489,7 +502,7 @@ public:
             utility::LogDebug("[FindCandidateVertex] returns {:d}",
                               min_candidate->idx_);
         }
-        return min_candidate;
+        return min_candidate;//頂点を返す
     }
 
     //トライアングルメッシュを拡張する
@@ -506,6 +519,7 @@ public:
             }
 
             Eigen::Vector3d center;
+            //Frontエッジから候補点を見つける
             BallPivotingVertexPtr candidate =
                     FindCandidateVertex(edge, radius, center);
             if (candidate == nullptr ||
@@ -704,11 +718,15 @@ public:
         return false;
     }
 
+    //引数の半径
     void FindSeedTriangle(double radius) {
+        //全点をループで調べる
         for (size_t vidx = 0; vidx < vertices.size(); ++vidx) {
             utility::LogDebug("[FindSeedTriangle] with radius={}, vidx={}",
                               radius, vidx);
+            //頂点のタイプがOrphan(メッシュの一部として使われていない)の場合
             if (vertices[vidx]->type_ == BallPivotingVertex::Type::Orphan) {
+                //フロントエッジを見つけられた場合
                 if (TrySeed(vertices[vidx], radius)) {
                     ExpandTriangulation(radius);
                 }
@@ -790,7 +808,7 @@ public:
 
 private:
     bool has_normals_;
-    KDTreeFlann kdtree_;
+    KDTreeFlann kdtree_;//最近傍探索などに使用される
     std::list<BallPivotingEdgePtr> edge_front_;
     std::list<BallPivotingEdgePtr> border_edges_;
     std::vector<BallPivotingVertexPtr> vertices;
