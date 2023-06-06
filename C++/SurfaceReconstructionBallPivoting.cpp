@@ -87,10 +87,12 @@ public:
 //Front：この状態は、その頂点がメッシュの「フロント」（つまり、現在のメッシュの境界）に属している場合に設定されます。これらの頂点は、新しい三角形を形成するための適切な場所で、次にどの頂点を接続すべきかを決定するのに役立つ情報を提供します。
 //Inner：この状態は、その頂点がメッシュの「内部」に完全に含まれている（つまり、すでに完全に接続されている）場合に設定されます。これらの頂点はすでにメッシュ形成に完全に組み込まれており、これ以上の処理は必要ありません。
 void BallPivotingVertex::UpdateType() {
+    //頂点がどのエッジにも所属していない
     if (edges_.empty()) {
         type_ = Type::Orphan;
     } else {
         for (const BallPivotingEdgePtr& edge : edges_) {
+            //頂点が所属するエッジのタイプがInnerではない場合
             if (edge->type_ != BallPivotingEdge::Type::Inner) {
                 type_ = Type::Front;
                 return;
@@ -266,26 +268,29 @@ public:
         BallPivotingTrianglePtr triangle =
                 std::make_shared<BallPivotingTriangle>(v0, v1, v2, center);//新しいインスタンスを生成
 
-        BallPivotingEdgePtr e0 = GetLinkingEdge(v0, v1);
+        BallPivotingEdgePtr e0 = GetLinkingEdge(v0, v1);//エッジ生成
         if (e0 == nullptr) {
             e0 = std::make_shared<BallPivotingEdge>(v0, v1);
         }
+        //エッジを三角形に登録する．
         e0->AddAdjacentTriangle(triangle);
         v0->edges_.insert(e0);
         v1->edges_.insert(e0);
 
-        BallPivotingEdgePtr e1 = GetLinkingEdge(v1, v2);
+        BallPivotingEdgePtr e1 = GetLinkingEdge(v1, v2);//エッジ生成
         if (e1 == nullptr) {
             e1 = std::make_shared<BallPivotingEdge>(v1, v2);
         }
+        //エッジを三角形に登録する．
         e1->AddAdjacentTriangle(triangle);
         v1->edges_.insert(e1);
         v2->edges_.insert(e1);
 
-        BallPivotingEdgePtr e2 = GetLinkingEdge(v2, v0);
+        BallPivotingEdgePtr e2 = GetLinkingEdge(v2, v0);//エッジ生成
         if (e2 == nullptr) {
             e2 = std::make_shared<BallPivotingEdge>(v2, v0);
         }
+        //エッジを三角形に登録する．
         e2->AddAdjacentTriangle(triangle);
         v2->edges_.insert(e2);
         v0->edges_.insert(e2);
