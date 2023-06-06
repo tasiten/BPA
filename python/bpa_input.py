@@ -22,7 +22,7 @@ if __name__ == "__main__":
     distances = ptCloud.compute_nearest_neighbor_distance()
     avg_dist = np.mean(distances)
     radius = 2*avg_dist   
-    radii = [radius, radius * 2]
+    radii = [radius * 2]
     recMeshBPA = o3d.geometry.TriangleMesh.create_from_point_cloud_ball_pivoting(
             ptCloud, o3d.utility.DoubleVector(radii))
     
