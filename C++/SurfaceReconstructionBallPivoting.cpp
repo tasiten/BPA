@@ -58,6 +58,7 @@ public:
 public:
     BallPivotingVertexPtr source_;
     BallPivotingVertexPtr target_;
+    //エッジが接する可能性がある二つの三角形(triangle0, triangle1)
     BallPivotingTrianglePtr triangle0_;
     BallPivotingTrianglePtr triangle1_;
     Type type_;
@@ -102,6 +103,8 @@ void BallPivotingVertex::UpdateType() {
     }
 }
 
+
+//エッジ(BallPivotingEdge)に隣接する三角形を追加する.edge->AddAdjacentTriangle(triangle)のような形で使われる
 void BallPivotingEdge::AddAdjacentTriangle(BallPivotingTrianglePtr triangle) {
     if (triangle != triangle0_ && triangle != triangle1_) {
         //ここでtriangle0を作成する?
@@ -295,20 +298,22 @@ public:
         v2->edges_.insert(e2);
         v0->edges_.insert(e2);
 
+        //頂点のタイプ更新
         v0->UpdateType();
         v1->UpdateType();
         v2->UpdateType();
 
         Eigen::Vector3d face_normal =
-                ComputeFaceNormal(v0->point_, v1->point_, v2->point_);
-        if (face_normal.dot(v0->normal_) > -1e-16) {
+                ComputeFaceNormal(v0->point_, v1->point_, v2->point_);//面の法線ベクトルを求める
+        //計算した面法線と頂点法線がある程度同じ向きにするための処理，頂点の追加順で三角形の法線向きが変わる
+        if (face_normal.dot(v0->normal_) > -1e-16) {//面の法線と頂点v0の法線が同じ方向を向いている場合
             mesh_->triangles_.emplace_back(
-                    Eigen::Vector3i(v0->idx_, v1->idx_, v2->idx_));
-        } else {
+                    Eigen::Vector3i(v0->idx_, v1->idx_, v2->idx_));//新しい三角形を追加
+        } else {//面の法線と頂点v0の法線が同じ方向を向いていない場合
             mesh_->triangles_.emplace_back(
-                    Eigen::Vector3i(v0->idx_, v2->idx_, v1->idx_));
+                    Eigen::Vector3i(v0->idx_, v2->idx_, v1->idx_));//新しい三角形を追加
         }
-        mesh_->triangle_normals_.push_back(face_normal);
+        mesh_->triangle_normals_.push_back(face_normal);//法線を追加
     }
 
     //面の法線ベクトルを外積から求める
@@ -745,8 +750,9 @@ public:
             utility::LogError("ReconstructBallPivoting requires normals");
         }
 
-        mesh_->triangles_.clear();
+        mesh_->triangles_.clear();//メッシュをクリア
 
+        //与えられた半径を順番に使ってメッシュを生成する
         for (double radius : radii) {
             utility::LogDebug("[Run] ################################");
             utility::LogDebug("[Run] change to radius {:.4f}", radius);
