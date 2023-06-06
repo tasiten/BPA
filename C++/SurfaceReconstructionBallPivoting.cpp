@@ -102,6 +102,7 @@ void BallPivotingVertex::UpdateType() {
 
 void BallPivotingEdge::AddAdjacentTriangle(BallPivotingTrianglePtr triangle) {
     if (triangle != triangle0_ && triangle != triangle1_) {
+        //ここでtriangle0を作成する?
         if (triangle0_ == nullptr) {
             triangle0_ = triangle;
             type_ = Type::Front;
@@ -150,7 +151,7 @@ class BallPivoting {
 public:
     BallPivoting(const PointCloud& pcd)
         : has_normals_(pcd.HasNormals()), kdtree_(pcd) {
-        mesh_ = std::make_shared<TriangleMesh>();
+        mesh_ = std::make_shared<TriangleMesh>();//make_shardはインスタンス生成関数
         mesh_->vertices_ = pcd.points_;
         mesh_->vertex_normals_ = pcd.normals_;
         mesh_->vertex_colors_ = pcd.colors_;
@@ -263,7 +264,7 @@ public:
                 "[CreateTriangle] with v0.idx={}, v1.idx={}, v2.idx={}",
                 v0->idx_, v1->idx_, v2->idx_);
         BallPivotingTrianglePtr triangle =
-                std::make_shared<BallPivotingTriangle>(v0, v1, v2, center);
+                std::make_shared<BallPivotingTriangle>(v0, v1, v2, center);//新しいインスタンスを生成
 
         BallPivotingEdgePtr e0 = GetLinkingEdge(v0, v1);
         if (e0 == nullptr) {
