@@ -367,7 +367,7 @@ public:
         BallPivotingVertexPtr src = edge->source_;
         BallPivotingVertexPtr tgt = edge->target_;
 
-        const BallPivotingVertexPtr opp = edge->GetOppositeVertex();//三つ目の候補点(opp)を見つける，srcとtgtが含まれた三角形のもう一つの頂点を取得する
+        const BallPivotingVertexPtr opp = edge->GetOppositeVertex();//三つ目の点(opp)を見つける，srcとtgtが含まれた三角形のもう一つの頂点を取得する
         if (opp == nullptr) {
             utility::LogError("edge->GetOppositeVertex() returns nullptr.");
             assert(opp == nullptr);
@@ -638,7 +638,8 @@ public:
         return true;
     }
 
-    //頂点と半径を引数とし，フロントエッジを生成する．
+    //頂点と半径を引数とし，一番最初の三角形(シード三角形)の辺を見つけようとする
+    //具体的な内容としてはフロントエッジを生成する．
     bool TrySeed(BallPivotingVertexPtr& v, double radius) {
         utility::LogDebug("[TrySeed] with v.idx={}, radius={}", v->idx_,
                           radius);
@@ -687,6 +688,8 @@ public:
             if (candidate_vidx2 >= 0) {
                 const BallPivotingVertexPtr& nb1 = vertices[candidate_vidx2];
 
+                //↓全エッジのタイプがFrontであるかを確認する．なぜならシード三角形なので，全てのエッジはFrontにならなくてはいけない
+
                 BallPivotingEdgePtr e0 = GetLinkingEdge(v, nb1);//e0辺を生成
                 //e0が存在して，タイプがFront(つまり境界エッジ)ではない場合
                 if (e0 != nullptr &&
@@ -706,7 +709,7 @@ public:
                     continue;
                 }
 
-                CreateTriangle(v, nb0, nb1, center);//メッシュを生成
+                CreateTriangle(v, nb0, nb1, center);//メッシュを生成，またここで生成した三角形の各辺に各triangle0やtriangle1を登録する．
 
                 e0 = GetLinkingEdge(v, nb1);
                 e1 = GetLinkingEdge(nb0, nb1);
@@ -737,7 +740,7 @@ public:
         return false;
     }
 
-    //引数の半径
+    //引数の半径として，最初の三角形(シード三角形)を見つけて，拡張していく．
     void FindSeedTriangle(double radius) {
         //全点をループで調べる
         for (size_t vidx = 0; vidx < vertices.size(); ++vidx) {
