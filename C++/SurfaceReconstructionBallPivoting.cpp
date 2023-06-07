@@ -571,7 +571,7 @@ public:
         }
     }
 
-    //引数の3頂点が三角形になれるかを判定する
+    //引数の3頂点が三角形になれるかを判定する，また球の中心座標も計算する
     bool TryTriangleSeed(const BallPivotingVertexPtr& v0,
                          const BallPivotingVertexPtr& v1,
                          const BallPivotingVertexPtr& v2,
@@ -677,7 +677,7 @@ public:
                     continue;
                 }
                 //vとnb0とnb1が三角形になれる場合
-                if (TryTriangleSeed(v, nb0, nb1, indices, radius, center)) {
+                if (TryTriangleSeed(v, nb0, nb1, indices, radius, center)) {//ここで球の中心座標も計算する
                     //candidate_vidx2にnb1のインデックス番号，つまり正の値を代入する．
                     candidate_vidx2 = nb1->idx_;
                     break;
