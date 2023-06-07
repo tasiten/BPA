@@ -770,6 +770,7 @@ public:
             }
 
             // update radius => update border edges
+            //最初の半径はこのfor文の工程は行わない．ここは最初の半径の球で作成した面を次の半径の球で生成した面に更新するためにある
             for (auto it = border_edges_.begin(); it != border_edges_.end();) {
                 BallPivotingEdgePtr edge = *it;
                 BallPivotingTrianglePtr triangle = edge->triangle0_;
@@ -812,10 +813,14 @@ public:
                 ++it;
             }
 
+
             // do the reconstruction
+            //ここが一番最初の半径が実行する一番最初の処理
             if (edge_front_.empty()) {
+                //一番最初の三角形(シード，種)を見つける
                 FindSeedTriangle(radius);
             } else {
+                //三角形を拡張していく
                 ExpandTriangulation(radius);
             }
 
