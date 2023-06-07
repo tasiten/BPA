@@ -47,6 +47,10 @@ public:
 
 class BallPivotingEdge {
 public:
+    //Border: これは境界エッジを示します。つまり、このエッジは形状の表面を定義しますが、まだ処理されていないエッジです。境界エッジは1つの三角形にしか属さない（つまり、エッジが接する二つ目の三角形がまだ存在しない）ため、形状の「フロント」を形成します。
+    //ront: フロントエッジは、形状の生成がまだ進行中であることを示します。これらのエッジは現在の「フロント」を定義し、新しい三角形が形成される場所です。フロントエッジは、形状が成長し続ける方向を示します。
+    //Inner: 内部エッジは、形状の内部に存在するエッジを示します。これらのエッジはすでに完全に処理され、それぞれ2つの隣接する三角形に属しています。これらは形状の「内部」を形成し、その形状が完全に形成されたことを示します。
+    //新しく生成されたエッジはFrontとして始まり、その後処理が進むとInnerまたはBorderに変わります。
     enum Type { Border = 0, Front = 1, Inner = 2 };
 
     BallPivotingEdge(BallPivotingVertexPtr source, BallPivotingVertexPtr target)
@@ -268,7 +272,7 @@ public:
         return nullptr;
     }
 
-    //与えられた3点から3次元メッシュを生成
+    //与えられた3点から3次元メッシュを生成，またここで生成した三角形の各辺に各triangle0やtriangle1を登録する．
     void CreateTriangle(const BallPivotingVertexPtr& v0,
                         const BallPivotingVertexPtr& v1,
                         const BallPivotingVertexPtr& v2,
@@ -544,20 +548,22 @@ public:
             //Frontエッジから候補点を見つける
             BallPivotingVertexPtr candidate =
                     FindCandidateVertex(edge, radius, center);
+            //候補点がない場合か候補点タイプがInnerか新しい点が既存辺と接続可能ではない場合
             if (candidate == nullptr ||
                 candidate->type_ == BallPivotingVertex::Type::Inner ||
                 !IsCompatible(candidate, edge->source_, edge->target_)) {
-                edge->type_ = BallPivotingEdge::Type::Border;
-                border_edges_.push_back(edge);
+                edge->type_ = BallPivotingEdge::Type::Border;//辺タイプをボーダーにする
+                border_edges_.push_back(edge);//ボーダーエッジリストにエッジを追加
                 continue;
             }
 
             BallPivotingEdgePtr e0 = GetLinkingEdge(candidate, edge->source_);
             BallPivotingEdgePtr e1 = GetLinkingEdge(candidate, edge->target_);
+            //e0が存在してe0のタイプがFrontではない場合かe1が存在してe1のタイプがFrontではない場合
             if ((e0 != nullptr && e0->type_ != BallPivotingEdge::Type::Front) ||
                 (e1 != nullptr && e1->type_ != BallPivotingEdge::Type::Front)) {
-                edge->type_ = BallPivotingEdge::Type::Border;
-                border_edges_.push_back(edge);
+                edge->type_ = BallPivotingEdge::Type::Border;//辺タイプをボーダーにする
+                border_edges_.push_back(edge);//ボーダーエッジリストにエッジを追加
                 continue;
             }
 
@@ -840,8 +846,8 @@ public:
 private:
     bool has_normals_;
     KDTreeFlann kdtree_;//最近傍探索などに使用される
-    std::list<BallPivotingEdgePtr> edge_front_;
-    std::list<BallPivotingEdgePtr> border_edges_;
+    std::list<BallPivotingEdgePtr> edge_front_;//未処理のエッジリスト
+    std::list<BallPivotingEdgePtr> border_edges_;//処理済みの境界エッジ
     std::vector<BallPivotingVertexPtr> vertices;
     std::shared_ptr<TriangleMesh> mesh_;
 };
