@@ -461,6 +461,9 @@ public:
                     candidate->idx_, v.transpose(), a.transpose(),
                     b.transpose());
 
+            //これらはaとbの角度を計算するためにある．aは旧球と回転軸となっているエッジの中心(mp)のベクトルを表し，bは新球と回転軸となっているエッジの中心(mp)のベクトルを表している．
+            //なのでエッジの中心を軸として，新旧の球の中心の角度を求めようとしている．
+            //そして旧球と一番小さい角度で新たな点を見つけられる新球を見つけることが目的である．
             double cosinus = a.dot(b);
             cosinus = std::min(cosinus, 1.0);
             cosinus = std::max(cosinus, -1.0);
