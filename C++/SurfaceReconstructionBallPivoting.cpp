@@ -187,6 +187,7 @@ public:
 
     //3頂点と球の半径と計算された球の中心座標が格納されるcenterを引数とし，
     //球の中心座標を計算して，計算できたかどうかをBool値で返す．
+    //結果的に外接円半径が球半径(radius)より大きい場合Falseを返す
     bool ComputeBallCenter(int vidx1,
                            int vidx2,
                            int vidx3,
@@ -236,6 +237,7 @@ public:
         double height = radius * radius - circ_radius2;
 
         //高さが負の正の値の場合，球の中心座標を求めている
+        //結果的に外接円半径が球半径(radius)より大きい場合Falseを返す
         if (height >= 0.0) {
             //法線計算
             Eigen::Vector3d tr_norm = (v2 - v1).cross(v3 - v1);//(v2 - v1)と(v3 - v1)の外積を計算する
