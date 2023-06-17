@@ -785,6 +785,9 @@ public:
 
             // update radius => update border edges
             //最初の半径はこのfor文の工程は行わない．ここは最初の半径の球で作成した面を次の半径の球で生成した面に更新するためにある
+            //大まかな流れとしては最初の半径のボールである程度のメッシュを生成して，
+            //その最初の半径のボールでは点が離れすぎていてメッシュを生成できずに発生してしまった穴を次の半径のボールが埋めるという感じ．
+            //次の半径のボールは最初のボールが作ったBorder_edgeから探索を始める．つまり穴が空いているところから，穴を埋めることができないか近くの辺(点)を探す．
             for (auto it = border_edges_.begin(); it != border_edges_.end();) {
                 BallPivotingEdgePtr edge = *it;
                 BallPivotingTrianglePtr triangle = edge->triangle0_;
