@@ -47,6 +47,10 @@ public:
 
 class BallPivotingEdge {
 public:
+    //Border: これは境界エッジを示します。つまり、このエッジは形状の表面を定義しますが、まだ処理されていないエッジです。境界エッジは1つの三角形にしか属さない（つまり、エッジが接する二つ目の三角形がまだ存在しない）ため、形状の「フロント」を形成します。
+    //ront: フロントエッジは、形状の生成がまだ進行中であることを示します。これらのエッジは現在の「フロント」を定義し、新しい三角形が形成される場所です。フロントエッジは、形状が成長し続ける方向を示します。
+    //Inner: 内部エッジは、形状の内部に存在するエッジを示します。これらのエッジはすでに完全に処理され、それぞれ2つの隣接する三角形に属しています。これらは形状の「内部」を形成し、その形状が完全に形成されたことを示します。
+    //新しく生成されたエッジはFrontとして始まり、その後処理が進むとInnerまたはBorderに変わります。
     enum Type { Border = 0, Front = 1, Inner = 2 };
 
     BallPivotingEdge(BallPivotingVertexPtr source, BallPivotingVertexPtr target)
@@ -183,6 +187,7 @@ public:
 
     //3頂点と球の半径と計算された球の中心座標が格納されるcenterを引数とし，
     //球の中心座標を計算して，計算できたかどうかをBool値で返す．
+    //結果的に外接円半径が球半径(radius)より大きい場合Falseを返す
     bool ComputeBallCenter(int vidx1,
                            int vidx2,
                            int vidx3,
@@ -232,6 +237,7 @@ public:
         double height = radius * radius - circ_radius2;
 
         //高さが負の正の値の場合，球の中心座標を求めている
+        //結果的に外接円半径が球半径(radius)より大きい場合Falseを返す
         if (height >= 0.0) {
             //法線計算
             Eigen::Vector3d tr_norm = (v2 - v1).cross(v3 - v1);//(v2 - v1)と(v3 - v1)の外積を計算する
@@ -268,7 +274,7 @@ public:
         return nullptr;
     }
 
-    //与えられた3点から3次元メッシュを生成
+    //与えられた3点から3次元メッシュを生成，またここで生成した三角形の各辺に各triangle0やtriangle1を登録する．
     void CreateTriangle(const BallPivotingVertexPtr& v0,
                         const BallPivotingVertexPtr& v1,
                         const BallPivotingVertexPtr& v2,
@@ -367,7 +373,7 @@ public:
         BallPivotingVertexPtr src = edge->source_;
         BallPivotingVertexPtr tgt = edge->target_;
 
-        const BallPivotingVertexPtr opp = edge->GetOppositeVertex();//三つ目の候補点(opp)を見つける，srcとtgtが含まれた三角形のもう一つの頂点を取得する
+        const BallPivotingVertexPtr opp = edge->GetOppositeVertex();//三つ目の点(opp)を見つける，srcとtgtが含まれた三角形のもう一つの頂点を取得する
         if (opp == nullptr) {
             utility::LogError("edge->GetOppositeVertex() returns nullptr.");
             assert(opp == nullptr);
@@ -461,6 +467,9 @@ public:
                     candidate->idx_, v.transpose(), a.transpose(),
                     b.transpose());
 
+            //これらはaとbの角度を計算するためにある．aは旧球と回転軸となっているエッジの中心(mp)のベクトルを表し，bは新球と回転軸となっているエッジの中心(mp)のベクトルを表している．
+            //なのでエッジの中心を軸として，新旧の球の中心の角度を求めようとしている．
+            //そして旧球と一番小さい角度で新たな点を見つけられる新球を見つけることが目的である．
             double cosinus = a.dot(b);
             cosinus = std::min(cosinus, 1.0);
             cosinus = std::max(cosinus, -1.0);
@@ -541,20 +550,22 @@ public:
             //Frontエッジから候補点を見つける
             BallPivotingVertexPtr candidate =
                     FindCandidateVertex(edge, radius, center);
+            //候補点がない場合か候補点タイプがInnerか新しい点が既存辺と接続可能ではない場合
             if (candidate == nullptr ||
                 candidate->type_ == BallPivotingVertex::Type::Inner ||
                 !IsCompatible(candidate, edge->source_, edge->target_)) {
-                edge->type_ = BallPivotingEdge::Type::Border;
-                border_edges_.push_back(edge);
+                edge->type_ = BallPivotingEdge::Type::Border;//辺タイプをボーダーにする
+                border_edges_.push_back(edge);//ボーダーエッジリストにエッジを追加
                 continue;
             }
 
             BallPivotingEdgePtr e0 = GetLinkingEdge(candidate, edge->source_);
             BallPivotingEdgePtr e1 = GetLinkingEdge(candidate, edge->target_);
+            //e0が存在してe0のタイプがFrontではない場合かe1が存在してe1のタイプがFrontではない場合
             if ((e0 != nullptr && e0->type_ != BallPivotingEdge::Type::Front) ||
                 (e1 != nullptr && e1->type_ != BallPivotingEdge::Type::Front)) {
-                edge->type_ = BallPivotingEdge::Type::Border;
-                border_edges_.push_back(edge);
+                edge->type_ = BallPivotingEdge::Type::Border;//辺タイプをボーダーにする
+                border_edges_.push_back(edge);//ボーダーエッジリストにエッジを追加
                 continue;
             }
 
@@ -571,7 +582,7 @@ public:
         }
     }
 
-    //引数の3頂点が三角形になれるかを判定する
+    //引数の3頂点が三角形になれるかを判定する，また球の中心座標も計算する
     bool TryTriangleSeed(const BallPivotingVertexPtr& v0,
                          const BallPivotingVertexPtr& v1,
                          const BallPivotingVertexPtr& v2,
@@ -638,7 +649,8 @@ public:
         return true;
     }
 
-    //頂点と半径を引数とし，フロントエッジを生成する．
+    //頂点と半径を引数とし，一番最初の三角形(シード三角形)の辺を見つけようとする
+    //具体的な内容としてはフロントエッジを生成する．
     bool TrySeed(BallPivotingVertexPtr& v, double radius) {
         utility::LogDebug("[TrySeed] with v.idx={}, radius={}", v->idx_,
                           radius);
@@ -676,7 +688,7 @@ public:
                     continue;
                 }
                 //vとnb0とnb1が三角形になれる場合
-                if (TryTriangleSeed(v, nb0, nb1, indices, radius, center)) {
+                if (TryTriangleSeed(v, nb0, nb1, indices, radius, center)) {//ここで球の中心座標も計算する
                     //candidate_vidx2にnb1のインデックス番号，つまり正の値を代入する．
                     candidate_vidx2 = nb1->idx_;
                     break;
@@ -686,6 +698,8 @@ public:
             //candidate_vidx2 が非負の場合，つまりcandidate_vidx2にnb1のインデックス番号が代入された場合
             if (candidate_vidx2 >= 0) {
                 const BallPivotingVertexPtr& nb1 = vertices[candidate_vidx2];
+
+                //↓全エッジのタイプがFrontであるかを確認する．なぜならシード三角形なので，全てのエッジはFrontにならなくてはいけない
 
                 BallPivotingEdgePtr e0 = GetLinkingEdge(v, nb1);//e0辺を生成
                 //e0が存在して，タイプがFront(つまり境界エッジ)ではない場合
@@ -706,7 +720,7 @@ public:
                     continue;
                 }
 
-                CreateTriangle(v, nb0, nb1, center);//メッシュを生成
+                CreateTriangle(v, nb0, nb1, center);//メッシュを生成，またここで生成した三角形の各辺に各triangle0やtriangle1を登録する．
 
                 e0 = GetLinkingEdge(v, nb1);
                 e1 = GetLinkingEdge(nb0, nb1);
@@ -737,7 +751,7 @@ public:
         return false;
     }
 
-    //引数の半径
+    //引数の半径として，最初の三角形(シード三角形)を見つけて，拡張していく．
     void FindSeedTriangle(double radius) {
         //全点をループで調べる
         for (size_t vidx = 0; vidx < vertices.size(); ++vidx) {
@@ -770,6 +784,10 @@ public:
             }
 
             // update radius => update border edges
+            //最初の半径はこのfor文の工程は行わない．ここは最初の半径の球で作成した面を次の半径の球で生成した面に更新するためにある
+            //大まかな流れとしては最初の半径のボールである程度のメッシュを生成して，
+            //その最初の半径のボールでは点が離れすぎていてメッシュを生成できずに発生してしまった穴を次の半径のボールが埋めるという感じ．
+            //次の半径のボールは最初のボールが作ったBorder_edgeから探索を始める．つまり穴が空いているところから，穴を埋めることができないか近くの辺(点)を探す．
             for (auto it = border_edges_.begin(); it != border_edges_.end();) {
                 BallPivotingEdgePtr edge = *it;
                 BallPivotingTrianglePtr triangle = edge->triangle0_;
@@ -812,10 +830,14 @@ public:
                 ++it;
             }
 
+
             // do the reconstruction
+            //ここが一番最初の半径が実行する一番最初の処理
             if (edge_front_.empty()) {
+                //一番最初の三角形(シード，種)を見つける
                 FindSeedTriangle(radius);
             } else {
+                //三角形を拡張していく
                 ExpandTriangulation(radius);
             }
 
@@ -829,8 +851,8 @@ public:
 private:
     bool has_normals_;
     KDTreeFlann kdtree_;//最近傍探索などに使用される
-    std::list<BallPivotingEdgePtr> edge_front_;
-    std::list<BallPivotingEdgePtr> border_edges_;
+    std::list<BallPivotingEdgePtr> edge_front_;//未処理のエッジリスト
+    std::list<BallPivotingEdgePtr> border_edges_;//処理済みの境界エッジ
     std::vector<BallPivotingVertexPtr> vertices;
     std::shared_ptr<TriangleMesh> mesh_;
 };
